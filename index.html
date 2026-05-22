@@ -959,12 +959,285 @@
   </div>
 </div>
 
+<style>
+  /* ── SAVE BAR ── */
+  .save-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: #0d0d0f; border-top: 1px solid #2a2a30;
+    padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
+  }
+  .save-bar .week-selector {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .save-bar label { font-size: 10px; color: #888896; letter-spacing: 0.1em; text-transform: uppercase; }
+  .save-bar select {
+    background: #1a1a1e; border: 1px solid #2a2a30; color: #f0f0f2;
+    font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 4px;
+    outline: none; cursor: pointer;
+  }
+  .save-bar select:focus { border-color: #e8112d; }
+  .btn-save {
+    background: #e8112d; color: white; border: none;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.15em;
+    padding: 10px 20px; border-radius: 4px; cursor: pointer;
+    text-transform: uppercase; transition: background 0.2s; white-space: nowrap;
+  }
+  .btn-save:hover { background: #ff2040; }
+  .btn-save:disabled { background: #444; cursor: not-allowed; }
+  .btn-load {
+    background: transparent; color: #888896; border: 1px solid #2a2a30;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    padding: 10px 16px; border-radius: 4px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-load:hover { border-color: #3b82f6; color: #3b82f6; }
+  .save-status {
+    font-size: 11px; margin-left: auto; padding: 6px 12px;
+    border-radius: 4px; font-weight: 700; opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .save-status.ok { background: rgba(34,197,94,0.15); color: #22c55e; opacity: 1; }
+  .save-status.err { background: rgba(232,17,45,0.15); color: #e8112d; opacity: 1; }
+  .save-status.loading { background: rgba(59,130,246,0.15); color: #3b82f6; opacity: 1; }
+
+  /* ── CONFIG PANEL ── */
+  .config-toggle {
+    background: transparent; border: none; color: #444450;
+    font-size: 18px; cursor: pointer; padding: 6px; line-height: 1;
+    transition: color 0.2s;
+  }
+  .config-toggle:hover { color: #888896; }
+  .config-panel {
+    display: none; position: fixed; bottom: 60px; left: 0; right: 0; z-index: 99;
+    background: #141416; border-top: 1px solid #2a2a30;
+    padding: 20px; box-shadow: 0 -8px 32px rgba(0,0,0,0.8);
+  }
+  .config-panel.open { display: block; }
+  .config-panel h4 { font-size: 10px; letter-spacing: 0.2em; color: #888896; text-transform: uppercase; margin-bottom: 12px; }
+  .config-panel input[type=text] {
+    width: 100%; background: #0d0d0f; border: 1px solid #2a2a30;
+    color: #f0f0f2; font-size: 12px; padding: 10px 14px; border-radius: 4px;
+    outline: none; font-family: monospace;
+  }
+  .config-panel input[type=text]:focus { border-color: #e8112d; }
+  .config-panel .hint { font-size: 11px; color: #555560; margin-top: 6px; line-height: 1.5; }
+  .config-panel .btn-cfg-save {
+    margin-top: 12px; background: #1a1a1e; color: #f0f0f2;
+    border: 1px solid #2a2a30; font-size: 11px; font-weight: 700;
+    padding: 8px 16px; border-radius: 4px; cursor: pointer;
+  }
+  body { padding-bottom: 64px; }
+</style>
+
+<!-- CONFIG PANEL -->
+<div class="config-panel" id="configPanel">
+  <h4>⚙️ URL del Google Apps Script</h4>
+  <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXX/exec">
+  <div class="hint">Pega aquí la URL que obtienes al publicar tu Google Apps Script. Se guarda en este navegador automáticamente.</div>
+  <button class="btn-cfg-save" onclick="saveConfig()">Guardar URL</button>
+</div>
+
+<!-- SAVE BAR -->
+<div class="save-bar">
+  <button class="config-toggle" onclick="toggleConfig()" title="Configurar URL">⚙️</button>
+  <div class="week-selector">
+    <label>Semana</label>
+    <select id="weekSelect">
+      <option value="1">Semana 1</option>
+      <option value="2">Semana 2</option>
+      <option value="3">Semana 3</option>
+      <option value="4">Semana 4</option>
+      <option value="5">Semana 5</option>
+      <option value="6">Semana 6</option>
+      <option value="7">Semana 7</option>
+      <option value="8">Semana 8</option>
+    </select>
+  </div>
+  <button class="btn-save" onclick="guardarDatos()">💾 Guardar sesión</button>
+  <button class="btn-load" onclick="cargarDatos()">↓ Cargar</button>
+  <div class="save-status" id="saveStatus"></div>
+</div>
+
 <script>
+/* ═══════════════════════════════════════════════════
+   NAVEGACIÓN DE DÍAS
+═══════════════════════════════════════════════════ */
 function showDay(id, btn) {
   document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════════
+   CONFIG — URL DEL APPS SCRIPT
+═══════════════════════════════════════════════════ */
+function toggleConfig() {
+  document.getElementById('configPanel').classList.toggle('open');
+}
+function saveConfig() {
+  const url = document.getElementById('scriptUrl').value.trim();
+  if (url) {
+    localStorage.setItem('realshift_script_url', url);
+    document.getElementById('configPanel').classList.remove('open');
+    setStatus('URL guardada ✓', 'ok');
+  }
+}
+// Al cargar la página, restaurar URL guardada
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('realshift_script_url');
+  if (saved) document.getElementById('scriptUrl').value = saved;
+  // Restaurar semana seleccionada
+  const sem = localStorage.getItem('realshift_semana');
+  if (sem) document.getElementById('weekSelect').value = sem;
+  // Cargar datos automáticamente al abrir
+  cargarDatos(true);
+});
+document.getElementById('weekSelect').addEventListener('change', () => {
+  localStorage.setItem('realshift_semana', document.getElementById('weekSelect').value);
+  cargarDatos(true); // auto-cargar al cambiar semana
+});
+
+/* ═══════════════════════════════════════════════════
+   RECOGER TODOS LOS INPUTS
+═══════════════════════════════════════════════════ */
+function recogerDatos() {
+  const semana = document.getElementById('weekSelect').value;
+  const datos = { semana, timestamp: new Date().toISOString(), dias: {} };
+
+  // Recorrer cada día
+  ['dayA','dayB','dayC','dayD'].forEach(dayId => {
+    const panel = document.getElementById(dayId);
+    if (!panel) return;
+    const rows = panel.querySelectorAll('.load-table tbody tr');
+    const ejercicios = [];
+    rows.forEach(row => {
+      const nombre = row.cells[0]?.textContent?.trim();
+      if (!nombre) return;
+      const inputs = row.querySelectorAll('input[type=number]');
+      const checks = row.querySelectorAll('input[type=checkbox]');
+      const vals = Array.from(inputs).map(i => i.value || '');
+      ejercicios.push({
+        nombre,
+        s1kg: vals[0]||'', s1rpe: vals[1]||'',
+        s2kg: vals[2]||'', s2rpe: vals[3]||'',
+        s3kg: vals[4]||'', s3rpe: vals[5]||'',
+        s4kg: vals[6]||'', s4rpe: vals[7]||'',
+        hecho: checks[0]?.checked ? 'SI' : 'NO'
+      });
+    });
+    datos.dias[dayId] = ejercicios;
+  });
+  return datos;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESTAURAR DATOS EN LOS INPUTS
+═══════════════════════════════════════════════════ */
+function restaurarDatos(datos) {
+  if (!datos || !datos.dias) return;
+  ['dayA','dayB','dayC','dayD'].forEach(dayId => {
+    const panel = document.getElementById(dayId);
+    if (!panel || !datos.dias[dayId]) return;
+    const rows = panel.querySelectorAll('.load-table tbody tr');
+    datos.dias[dayId].forEach((ej, i) => {
+      const row = rows[i];
+      if (!row) return;
+      const inputs = row.querySelectorAll('input[type=number]');
+      const checks = row.querySelectorAll('input[type=checkbox]');
+      const vals = [ej.s1kg,ej.s1rpe,ej.s2kg,ej.s2rpe,ej.s3kg,ej.s3rpe,ej.s4kg,ej.s4rpe];
+      Array.from(inputs).forEach((inp, idx) => { if (vals[idx] !== undefined) inp.value = vals[idx]; });
+      if (checks[0]) checks[0].checked = ej.hecho === 'SI';
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   STATUS HELPER
+═══════════════════════════════════════════════════ */
+function setStatus(msg, type) {
+  const el = document.getElementById('saveStatus');
+  el.textContent = msg;
+  el.className = 'save-status ' + type;
+  if (type !== 'loading') setTimeout(() => { el.className = 'save-status'; }, 3500);
+}
+
+/* ═══════════════════════════════════════════════════
+   GUARDAR — localStorage + Google Sheets
+═══════════════════════════════════════════════════ */
+async function guardarDatos() {
+  const datos = recogerDatos();
+  const semana = datos.semana;
+  const clave = `realshift_cristina_s${semana}`;
+
+  // 1. Siempre guardar en localStorage como respaldo local
+  localStorage.setItem(clave, JSON.stringify(datos));
+  localStorage.setItem('realshift_cristina_last', clave);
+
+  // 2. Intentar enviar a Google Sheets si hay URL configurada
+  const scriptUrl = localStorage.getItem('realshift_script_url');
+  if (!scriptUrl) {
+    setStatus('Guardado local ✓ (sin nube — configura URL ⚙️)', 'ok');
+    return;
+  }
+
+  setStatus('Guardando en nube...', 'loading');
+  document.querySelector('.btn-save').disabled = true;
+
+  try {
+    // Preparar fila plana para Sheets
+    const filas = [];
+    ['dayA','dayB','dayC','dayD'].forEach(dayId => {
+      (datos.dias[dayId] || []).forEach(ej => {
+        filas.push([
+          datos.timestamp,
+          `Semana ${semana}`,
+          dayId,
+          ej.nombre,
+          ej.s1kg, ej.s1rpe,
+          ej.s2kg, ej.s2rpe,
+          ej.s3kg, ej.s3rpe,
+          ej.s4kg, ej.s4rpe,
+          ej.hecho
+        ]);
+      });
+    });
+
+    await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors', // necesario para Apps Script desde GitHub Pages
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente: 'Cristina Franco', filas })
+    });
+
+    // no-cors no devuelve respuesta legible, asumimos éxito si no hay error
+    setStatus('Guardado en nube ✓', 'ok');
+  } catch (err) {
+    setStatus('Nube no disponible — guardado local ✓', 'ok');
+  } finally {
+    document.querySelector('.btn-save').disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   CARGAR — desde localStorage
+═══════════════════════════════════════════════════ */
+function cargarDatos(silencioso = false) {
+  const semana = document.getElementById('weekSelect').value;
+  const clave = `realshift_cristina_s${semana}`;
+  const raw = localStorage.getItem(clave);
+  if (raw) {
+    try {
+      const datos = JSON.parse(raw);
+      restaurarDatos(datos);
+      if (!silencioso) setStatus(`Semana ${semana} cargada ✓`, 'ok');
+    } catch(e) {
+      if (!silencioso) setStatus('Error al cargar datos', 'err');
+    }
+  } else {
+    if (!silencioso) setStatus(`Sin datos guardados para semana ${semana}`, 'err');
+  }
 }
 </script>
 </body>
